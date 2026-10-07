@@ -1,0 +1,8 @@
+<nav search_view="search" color="#FF8000">
+  <view name="f1_live_telemetry" default="true" />
+  <view name="f1_lap_comparison" />
+  <view name="f1_results_health" />
+  <collection label="Investigate">
+    <view name="search" />
+  </collection>
+</nav>

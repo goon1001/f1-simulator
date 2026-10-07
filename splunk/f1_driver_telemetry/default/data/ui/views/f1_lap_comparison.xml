@@ -1,0 +1,308 @@
+<dashboard version="2" theme="dark">
+  <label>F1 Driver Telemetry — Lap Comparison</label>
+  <description>Attempt-level lap, speed and race-result comparison.</description>
+  <definition><![CDATA[
+{
+  "title": "F1 Driver Telemetry \u2014 Lap Comparison",
+  "description": "Attempt-level lap, speed and race-result comparison.",
+  "dataSources": {
+    "ds_best_lap": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=SessionCompleted data_mode=$tok_mode$ best_lap_time_in_ms>0 | dedup record_id | stats min(best_lap_time_in_ms) as best_ms | eval value=round(best_ms/1000,3) | table value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_top_speed": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | stats max(speed) as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_attempts": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=SessionCompleted data_mode=$tok_mode$ | dedup record_id | stats dc(attempt_id) as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_lap_times": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=LapData data_mode=$tok_mode$ last_lap_time_in_ms>0 | stats latest(last_lap_time_in_ms) as lap_ms by attempt_id player_name current_lap_num | eval Lap=current_lap_num-1, lap_seconds=round(lap_ms/1000,3) | chart min(lap_seconds) over Lap by player_name",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_position": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=LapData data_mode=$tok_mode$ | timechart span=2s latest(car_position) as Position by player_name",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_speed_distance": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | fields attempt_id frame_identifier player_name speed | join type=inner attempt_id frame_identifier [ search index=data_drivers_f1_2025 source=f1_2025 sourcetype=LapData data_mode=$tok_mode$ | fields attempt_id frame_identifier lap_distance ] | bin lap_distance span=100 | chart avg(speed) over lap_distance by player_name",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_results": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=SessionCompleted data_mode=$tok_mode$ best_lap_time_in_ms>0 | dedup record_id | eval \"Best lap (s)\"=round(best_lap_time_in_ms/1000,3), \"Race time (s)\"=round(total_race_time,3) | sort 0 best_lap_time_in_ms | table player_name data_mode rig_name position grid_position \"Best lap (s)\" \"Race time (s)\" num_laps num_penalties",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    }
+  },
+  "defaults": {},
+  "visualizations": {
+    "viz_header": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "# F1 Driver Telemetry \u2014 Lap Comparison\nCompare attempts, laps, pace, position and control traces",
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_nav": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "[LIVE TELEMETRY](/app/f1_driver_telemetry/f1_live_telemetry) &nbsp; | &nbsp; [LAP COMPARISON](/app/f1_driver_telemetry/f1_lap_comparison) &nbsp; | &nbsp; [RESULTS & HEALTH](/app/f1_driver_telemetry/f1_results_health)",
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_best_lap": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_best_lap"
+      },
+      "options": {
+        "majorColor": "#FF8000",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_top_speed": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_top_speed"
+      },
+      "options": {
+        "majorColor": "#47C7FC",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_attempts": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_attempts"
+      },
+      "options": {
+        "majorColor": "#8BE28B",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_lap_times": {
+      "type": "splunk.column",
+      "dataSources": {
+        "primary": "ds_lap_times"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_position": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_position"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_speed_distance": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_speed_distance"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_results": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_results"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    }
+  },
+  "inputs": {
+    "input_time": {
+      "type": "input.timerange",
+      "title": "Time range",
+      "options": {
+        "token": "global_time",
+        "defaultValue": "-24h,now"
+      }
+    },
+    "input_mode": {
+      "type": "input.dropdown",
+      "title": "Data mode",
+      "options": {
+        "token": "tok_mode",
+        "defaultValue": "*",
+        "items": [
+          {
+            "label": "Live + playback",
+            "value": "*"
+          },
+          {
+            "label": "Live only",
+            "value": "live"
+          },
+          {
+            "label": "Playback only",
+            "value": "playback"
+          }
+        ]
+      }
+    }
+  },
+  "layout": {
+    "type": "absolute",
+    "options": {
+      "width": 1440,
+      "height": 1200,
+      "display": "auto-scale",
+      "backgroundColor": "#0B0F14"
+    },
+    "structure": [
+      {
+        "item": "viz_header",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 20,
+          "w": 960,
+          "h": 80
+        }
+      },
+      {
+        "item": "viz_nav",
+        "type": "block",
+        "position": {
+          "x": 1000,
+          "y": 34,
+          "w": 416,
+          "h": 54
+        }
+      },
+      {
+        "item": "viz_best_lap",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 120,
+          "w": 440,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_top_speed",
+        "type": "block",
+        "position": {
+          "x": 500,
+          "y": 120,
+          "w": 440,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_attempts",
+        "type": "block",
+        "position": {
+          "x": 976,
+          "y": 120,
+          "w": 440,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_lap_times",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 276,
+          "w": 686,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_position",
+        "type": "block",
+        "position": {
+          "x": 734,
+          "y": 276,
+          "w": 682,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_speed_distance",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 600,
+          "w": 1392,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_results",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 924,
+          "w": 1392,
+          "h": 250
+        }
+      }
+    ],
+    "globalInputs": [
+      "input_time",
+      "input_mode"
+    ]
+  }
+}
+  ]]></definition>
+</dashboard>

@@ -1,0 +1,369 @@
+<dashboard version="2" theme="dark">
+  <label>F1 Driver Telemetry — Live</label>
+  <description>Current speed, controls, tyre temperatures, G force, ERS and fuel.</description>
+  <definition><![CDATA[
+{
+  "title": "F1 Driver Telemetry \u2014 Live",
+  "description": "Current speed, controls, tyre temperatures, G force, ERS and fuel.",
+  "dataSources": {
+    "ds_driver": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | stats latest(player_name) as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_speed": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | stats latest(speed) as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_rpm": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | stats latest(engine_rpm) as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_lap": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=LapData data_mode=$tok_mode$ | stats latest(current_lap_num) as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_speed_trace": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | timechart span=1s avg(speed) as \"Speed (km/h)\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_controls": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | eval throttle_pct=round(throttle*100,1), brake_pct=round(brake*100,1) | timechart span=1s avg(throttle_pct) as \"Throttle %\" avg(brake_pct) as \"Brake %\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_tyre_temperature": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | eval front_temp=round((tyres_surface_temperature_fl+tyres_surface_temperature_fr)/2,1), rear_temp=round((tyres_surface_temperature_rl+tyres_surface_temperature_rr)/2,1) | timechart span=2s avg(front_temp) as \"Front tyres \u00b0C\" avg(rear_temp) as \"Rear tyres \u00b0C\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_gforce": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=MotionData data_mode=$tok_mode$ | timechart span=1s avg(g_force_lateral) as \"Lateral G\" avg(g_force_longitudinal) as \"Longitudinal G\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_status": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarStatusData data_mode=$tok_mode$ | stats latest(player_name) as Driver latest(rig_name) as Rig latest(ers_store_energy) as ERS_J latest(fuel_in_tank) as Fuel_kg latest(fuel_remaining_laps) as Fuel_laps latest(tyres_age_laps) as Tyre_age latest(drs_allowed) as DRS_allowed latest(engine_power_ice) as ICE_W | eval \"ERS %\"=round(ERS_J/4000000*100,1), \"Fuel kg\"=round(Fuel_kg,2), \"Fuel laps\"=round(Fuel_laps,2), \"ICE kW\"=round(ICE_W/1000,1) | table Driver Rig \"ERS %\" \"Fuel kg\" \"Fuel laps\" Tyre_age DRS_allowed \"ICE kW\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    }
+  },
+  "defaults": {},
+  "visualizations": {
+    "viz_header": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "# F1 Driver Telemetry \u2014 Live\nF1 25 \u00b7 v6 collector \u00b7 10 Hz driver telemetry",
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_nav": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "[LIVE TELEMETRY](/app/f1_driver_telemetry/f1_live_telemetry) &nbsp; | &nbsp; [LAP COMPARISON](/app/f1_driver_telemetry/f1_lap_comparison) &nbsp; | &nbsp; [RESULTS & HEALTH](/app/f1_driver_telemetry/f1_results_health)",
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_driver": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_driver"
+      },
+      "options": {
+        "majorColor": "#FF8000",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_speed": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_speed"
+      },
+      "options": {
+        "majorColor": "#47C7FC",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_rpm": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_rpm"
+      },
+      "options": {
+        "majorColor": "#F5C451",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_lap": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_lap"
+      },
+      "options": {
+        "majorColor": "#8BE28B",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_speed_trace": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_speed_trace"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_controls": {
+      "type": "splunk.area",
+      "dataSources": {
+        "primary": "ds_controls"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_tyre_temperature": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_tyre_temperature"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_gforce": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_gforce"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_status": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_status"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    }
+  },
+  "inputs": {
+    "input_time": {
+      "type": "input.timerange",
+      "title": "Time range",
+      "options": {
+        "token": "global_time",
+        "defaultValue": "-24h,now"
+      }
+    },
+    "input_mode": {
+      "type": "input.dropdown",
+      "title": "Data mode",
+      "options": {
+        "token": "tok_mode",
+        "defaultValue": "*",
+        "items": [
+          {
+            "label": "Live + playback",
+            "value": "*"
+          },
+          {
+            "label": "Live only",
+            "value": "live"
+          },
+          {
+            "label": "Playback only",
+            "value": "playback"
+          }
+        ]
+      }
+    }
+  },
+  "layout": {
+    "type": "absolute",
+    "options": {
+      "width": 1440,
+      "height": 1110,
+      "display": "auto-scale",
+      "backgroundColor": "#0B0F14"
+    },
+    "structure": [
+      {
+        "item": "viz_header",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 20,
+          "w": 960,
+          "h": 80
+        }
+      },
+      {
+        "item": "viz_nav",
+        "type": "block",
+        "position": {
+          "x": 1000,
+          "y": 34,
+          "w": 416,
+          "h": 54
+        }
+      },
+      {
+        "item": "viz_driver",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_speed",
+        "type": "block",
+        "position": {
+          "x": 378,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_rpm",
+        "type": "block",
+        "position": {
+          "x": 732,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_lap",
+        "type": "block",
+        "position": {
+          "x": 1086,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_speed_trace",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 276,
+          "w": 686,
+          "h": 280
+        }
+      },
+      {
+        "item": "viz_controls",
+        "type": "block",
+        "position": {
+          "x": 734,
+          "y": 276,
+          "w": 682,
+          "h": 280
+        }
+      },
+      {
+        "item": "viz_tyre_temperature",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 580,
+          "w": 686,
+          "h": 270
+        }
+      },
+      {
+        "item": "viz_gforce",
+        "type": "block",
+        "position": {
+          "x": 734,
+          "y": 580,
+          "w": 682,
+          "h": 270
+        }
+      },
+      {
+        "item": "viz_status",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 874,
+          "w": 1392,
+          "h": 210
+        }
+      }
+    ],
+    "globalInputs": [
+      "input_time",
+      "input_mode"
+    ]
+  }
+}
+  ]]></definition>
+</dashboard>

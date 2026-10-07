@@ -10,3 +10,8 @@ public/
 resources/
 .hugo_build.lock
 .hugo-cache/
+.env
+.env.*
+!.env.example
+dist/
+*.tar.gz

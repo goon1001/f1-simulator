@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NETWORK_NAME="f1-telemetry"
+SPLUNK_CONTAINER="${SPLUNK_CONTAINER:-splunk-dev}"
+COLLECTOR_CONTAINER="f1-2025"
+UI_PORT="${F1_UI_PORT:-8501}"
+UDP_BIND="${F1_UDP_BIND:-0.0.0.0}"
+IMAGE_TAG="ghcr.io/splunk/f1-2025-v6:6.0.5"
+IMAGE_DIGEST="sha256:bf773b89d9380e09fd1c587f629768336bfe08e50fe79fb03c8a5c69c97d2f47"
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_tools() {
+  command -v podman >/dev/null 2>&1 || die "Podman is not installed."
+  command -v curl >/dev/null 2>&1 || die "curl is required."
+}
+
+machine_running() {
+  podman machine inspect podman-machine-default --format '{{.State}}' 2>/dev/null | grep -qi '^running$'
+}
+
+start_machine() {
+  if ! machine_running; then
+    log "Starting Podman machine..."
+    podman machine start
+  fi
+}
+
+engine() {
+  # Run inside the VM to avoid a Podman 5.8 remote-client image-inspect bug.
+  podman machine ssh -- podman "$@"
+}
+
+ensure_network() {
+  engine network exists "$NETWORK_NAME" || engine network create "$NETWORK_NAME" >/dev/null
+}
+
+connect_splunk() {
+  engine container exists "$SPLUNK_CONTAINER" ||
+    die "Existing Splunk container '$SPLUNK_CONTAINER' was not found."
+
+  if [ -z "$(engine ps --quiet --filter "name=^${SPLUNK_CONTAINER}$")" ]; then
+    log "Starting existing Splunk container $SPLUNK_CONTAINER..."
+    engine start "$SPLUNK_CONTAINER" >/dev/null
+  fi
+
+  if ! engine inspect "$SPLUNK_CONTAINER" | python3 -c \
+    'import json,sys; raise SystemExit(0 if sys.argv[1] in json.load(sys.stdin)[0]["NetworkSettings"]["Networks"] else 1)' \
+    "$NETWORK_NAME"; then
+    log "Connecting $SPLUNK_CONTAINER to $NETWORK_NAME..."
+    engine network connect "$NETWORK_NAME" "$SPLUNK_CONTAINER"
+  fi
+}
+
+preflight() {
+  require_tools
+  start_machine
+  ensure_network
+  connect_splunk
+  engine ps --filter "name=^${SPLUNK_CONTAINER}$"
+  engine network inspect "$NETWORK_NAME" >/dev/null
+  printf 'Network: %s\n' "$NETWORK_NAME"
+}
+
+start() {
+  preflight
+  if engine container exists "$COLLECTOR_CONTAINER"; then
+    if [ -z "$(engine ps --quiet --filter "name=^${COLLECTOR_CONTAINER}$")" ]; then
+      log "Starting existing F1 collector..."
+      engine start "$COLLECTOR_CONTAINER" >/dev/null
+    fi
+  else
+    log "Creating the pinned F1 collector..."
+    engine volume exists f1-v6-data || engine volume create f1-v6-data >/dev/null
+    engine pull "$IMAGE_TAG" >/dev/null
+    image_json="$(engine image inspect "$IMAGE_TAG")"
+    if ! printf '%s' "$image_json" | grep -q "$IMAGE_DIGEST"; then
+      die "Pulled image does not match the approved ARM64 digest."
+    fi
+    image_id="$(printf '%s' "$image_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0]["Id"])')"
+    engine run -d \
+      --name "$COLLECTOR_CONTAINER" \
+      --restart unless-stopped \
+      --stop-timeout 120 \
+      --read-only \
+      --cap-drop ALL \
+      --security-opt no-new-privileges \
+      --network "$NETWORK_NAME" \
+      --mount type=volume,source=f1-v6-data,target=/data \
+      -p "127.0.0.1:${UI_PORT}:8501/tcp" \
+      -p "${UDP_BIND}:20777:20777/udp" \
+      -p "${UDP_BIND}:20778:20778/udp" \
+      -p "${UDP_BIND}:20779:20779/udp" \
+      -p "${UDP_BIND}:20780:20780/udp" \
+      "$image_id" >/dev/null
+  fi
+  log "Collector UI: http://127.0.0.1:$UI_PORT"
+}
+
+status() {
+  require_tools
+  start_machine
+  engine ps --filter "name=^${COLLECTOR_CONTAINER}$"
+  if curl -fsS --max-time 3 "http://127.0.0.1:$UI_PORT/healthz" >/dev/null; then
+    printf 'Health: healthy\n'
+  else
+    printf 'Health: unavailable\n'
+    return 1
+  fi
+}
+
+stop() {
+  require_tools
+  start_machine
+  if engine container exists "$COLLECTOR_CONTAINER"; then
+    engine stop --time 120 "$COLLECTOR_CONTAINER"
+  fi
+}
+
+case "${1:-}" in
+  preflight) preflight ;;
+  start|up) start ;;
+  stop) stop ;;
+  restart)
+    stop
+    start
+    ;;
+  status) status ;;
+  logs)
+    require_tools
+    start_machine
+    engine logs -f "$COLLECTOR_CONTAINER"
+    ;;
+  *)
+    cat <<'USAGE'
+Usage: ./f1ctl <command>
+
+Commands:
+  preflight  Verify Podman, the existing Splunk container, and shared network
+  start      Start the Podman machine if needed and run the collector
+  stop       Gracefully stop the collector and retain /data
+  restart    Stop and start the collector
+  status     Show container state and check /healthz
+  logs       Follow collector logs
+USAGE
+    exit 2
+    ;;
+esac

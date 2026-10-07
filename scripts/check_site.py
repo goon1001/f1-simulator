@@ -43,7 +43,7 @@ def check(directory):
 
     expected = {"index.html", "404.html", "f1-2025/index.html", "event_guide/index.html"}
     for section, slugs in {
-        "f1-2025": "docker-setup configuration controller-config managing-collectors monitoring pit-wall telemetry dashboards",
+        "f1-2025": "docker-setup podman-splunk configuration controller-config managing-collectors monitoring pit-wall telemetry dashboards",
         "event_guide": "grand-prix assists rules structure simulation-settings weather go-racing",
     }.items():
         expected.update(f"{section}/{slug}/index.html" for slug in slugs.split())

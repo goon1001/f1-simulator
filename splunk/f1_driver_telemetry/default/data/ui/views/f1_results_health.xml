@@ -1,0 +1,398 @@
+<dashboard version="2" theme="dark">
+  <label>F1 Driver Telemetry — Results &amp; Health</label>
+  <description>Completed attempts and the collector-to-HEC delivery pipeline.</description>
+  <definition><![CDATA[
+{
+  "title": "F1 Driver Telemetry \u2014 Results & Health",
+  "description": "Completed attempts and the collector-to-HEC delivery pipeline.",
+  "dataSources": {
+    "ds_events": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 data_mode=$tok_mode$ | stats count as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_freshness": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CarTelemetryData data_mode=$tok_mode$ | stats latest(_time) as last | eval value=round(now()-last,1) | table value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_results_count": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=SessionCompleted data_mode=$tok_mode$ | dedup record_id | stats count as value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_best": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=SessionCompleted data_mode=$tok_mode$ best_lap_time_in_ms>0 | dedup record_id | stats min(best_lap_time_in_ms) as best | eval value=round(best/1000,3) | table value",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_volume": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 data_mode=$tok_mode$ | timechart span=1m count by sourcetype limit=10",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_modes": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=SessionCompleted data_mode=$tok_mode$ | dedup record_id | stats count by data_mode",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_delivery": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CollectorHealth destination=hec | stats latest(enabled) as Enabled latest(http_status) as HTTP latest(pending_batches) as Pending_batches latest(pending_bytes) as Pending_bytes latest(oldest_seconds) as Oldest_seconds latest(last_latency_ms) as Last_latency_ms latest(error_category) as Error by collector_id destination",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_health_trend": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=CollectorHealth destination=hec | timechart span=1m max(pending_batches) as \"Pending batches\" avg(last_latency_ms) as \"Delivery latency ms\"",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_sourcetypes": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 data_mode=$tok_mode$ | stats count latest(_time) as latest by sourcetype | eval Freshness=round(now()-latest,1) | rename count as Events sourcetype as Sourcetype | sort - Events | table Sourcetype Events Freshness",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    },
+    "ds_results": {
+      "type": "ds.search",
+      "options": {
+        "query": "index=data_drivers_f1_2025 source=f1_2025 sourcetype=SessionCompleted data_mode=$tok_mode$ | dedup record_id | eval \"Best lap (s)\"=round(best_lap_time_in_ms/1000,3), \"Race time (s)\"=round(total_race_time,3) | sort 0 best_lap_time_in_ms | table player_name data_mode custom_event rig_name position grid_position \"Best lap (s)\" \"Race time (s)\" completion_source",
+        "queryParameters": {
+          "earliest": "$global_time.earliest$",
+          "latest": "$global_time.latest$"
+        }
+      }
+    }
+  },
+  "defaults": {},
+  "visualizations": {
+    "viz_header": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "# F1 Driver Telemetry \u2014 Results & Health\nRace results, ingestion freshness, delivery queue and packet volume",
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_nav": {
+      "type": "splunk.markdown",
+      "options": {
+        "markdown": "[LIVE TELEMETRY](/app/f1_driver_telemetry/f1_live_telemetry) &nbsp; | &nbsp; [LAP COMPARISON](/app/f1_driver_telemetry/f1_lap_comparison) &nbsp; | &nbsp; [RESULTS & HEALTH](/app/f1_driver_telemetry/f1_results_health)",
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_events": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_events"
+      },
+      "options": {
+        "majorColor": "#47C7FC",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_freshness": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_freshness"
+      },
+      "options": {
+        "majorColor": "#F5C451",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_results_count": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_results_count"
+      },
+      "options": {
+        "majorColor": "#8BE28B",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_best": {
+      "type": "splunk.singlevalue",
+      "dataSources": {
+        "primary": "ds_best"
+      },
+      "options": {
+        "majorColor": "#FF8000",
+        "backgroundColor": "transparent",
+        "sparklineDisplay": "off",
+        "trendDisplay": "off"
+      }
+    },
+    "viz_volume": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_volume"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_modes": {
+      "type": "splunk.pie",
+      "dataSources": {
+        "primary": "ds_modes"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_delivery": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_delivery"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_health_trend": {
+      "type": "splunk.line",
+      "dataSources": {
+        "primary": "ds_health_trend"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_sourcetypes": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_sourcetypes"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    },
+    "viz_results": {
+      "type": "splunk.table",
+      "dataSources": {
+        "primary": "ds_results"
+      },
+      "options": {
+        "backgroundColor": "transparent"
+      }
+    }
+  },
+  "inputs": {
+    "input_time": {
+      "type": "input.timerange",
+      "title": "Time range",
+      "options": {
+        "token": "global_time",
+        "defaultValue": "-24h,now"
+      }
+    },
+    "input_mode": {
+      "type": "input.dropdown",
+      "title": "Data mode",
+      "options": {
+        "token": "tok_mode",
+        "defaultValue": "*",
+        "items": [
+          {
+            "label": "Live + playback",
+            "value": "*"
+          },
+          {
+            "label": "Live only",
+            "value": "live"
+          },
+          {
+            "label": "Playback only",
+            "value": "playback"
+          }
+        ]
+      }
+    }
+  },
+  "layout": {
+    "type": "absolute",
+    "options": {
+      "width": 1440,
+      "height": 1170,
+      "display": "auto-scale",
+      "backgroundColor": "#0B0F14"
+    },
+    "structure": [
+      {
+        "item": "viz_header",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 20,
+          "w": 960,
+          "h": 80
+        }
+      },
+      {
+        "item": "viz_nav",
+        "type": "block",
+        "position": {
+          "x": 1000,
+          "y": 34,
+          "w": 416,
+          "h": 54
+        }
+      },
+      {
+        "item": "viz_events",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_freshness",
+        "type": "block",
+        "position": {
+          "x": 378,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_results_count",
+        "type": "block",
+        "position": {
+          "x": 732,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_best",
+        "type": "block",
+        "position": {
+          "x": 1086,
+          "y": 120,
+          "w": 330,
+          "h": 130
+        }
+      },
+      {
+        "item": "viz_volume",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 276,
+          "w": 916,
+          "h": 290
+        }
+      },
+      {
+        "item": "viz_modes",
+        "type": "block",
+        "position": {
+          "x": 964,
+          "y": 276,
+          "w": 452,
+          "h": 290
+        }
+      },
+      {
+        "item": "viz_delivery",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 590,
+          "w": 686,
+          "h": 230
+        }
+      },
+      {
+        "item": "viz_health_trend",
+        "type": "block",
+        "position": {
+          "x": 734,
+          "y": 590,
+          "w": 682,
+          "h": 230
+        }
+      },
+      {
+        "item": "viz_sourcetypes",
+        "type": "block",
+        "position": {
+          "x": 24,
+          "y": 844,
+          "w": 686,
+          "h": 300
+        }
+      },
+      {
+        "item": "viz_results",
+        "type": "block",
+        "position": {
+          "x": 734,
+          "y": 844,
+          "w": 682,
+          "h": 300
+        }
+      }
+    ],
+    "globalInputs": [
+      "input_time",
+      "input_mode"
+    ]
+  }
+}
+  ]]></definition>
+</dashboard>

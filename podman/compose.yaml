@@ -1,0 +1,33 @@
+name: f1-telemetry
+
+services:
+  collector:
+    # ARM64 child manifest for v6.0.5; avoids mutable tags and emulation.
+    image: ghcr.io/splunk/f1-2025-v6@sha256:bf773b89d9380e09fd1c587f629768336bfe08e50fe79fb03c8a5c69c97d2f47
+    container_name: f1-2025
+    restart: unless-stopped
+    stop_grace_period: 120s
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges
+    ports:
+      - "127.0.0.1:${F1_UI_PORT:-8501}:8501/tcp"
+      - "${F1_UDP_BIND:-0.0.0.0}:20777:20777/udp"
+      - "${F1_UDP_BIND:-0.0.0.0}:20778:20778/udp"
+      - "${F1_UDP_BIND:-0.0.0.0}:20779:20779/udp"
+      - "${F1_UDP_BIND:-0.0.0.0}:20780:20780/udp"
+    volumes:
+      - f1-v6-data:/data
+    networks:
+      - f1-telemetry
+
+networks:
+  f1-telemetry:
+    name: f1-telemetry
+    external: true
+
+volumes:
+  f1-v6-data:
+    name: f1-v6-data

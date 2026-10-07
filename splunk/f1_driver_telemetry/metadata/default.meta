@@ -1,0 +1,12 @@
+[]
+access = read : [ * ], write : [ admin, power ]
+export = system
+
+[views]
+access = read : [ * ], write : [ admin, power ]
+
+[nav]
+access = read : [ * ], write : [ admin ]
+
+[macros]
+access = read : [ * ], write : [ admin, power ]

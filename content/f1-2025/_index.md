@@ -28,7 +28,7 @@ Only the attendee's car is exported during the race window: **Ready → first st
 {{< /tab >}}
 {{< tab name="Run locally" >}}
 
-1. Follow [Docker Setup](/f1-2025/docker-setup/), including a persistent `/data` volume.
+1. Follow [Docker Setup](/f1-2025/docker-setup/), or use the tested [Podman and local Splunk path](/f1-2025/podman-splunk/).
 2. Open `http://localhost:81` or `http://localhost:8501`.
 3. Configure the event, rigs and at least one destination.
 4. Follow [Game Telemetry Setup](/f1-2025/telemetry/), using the Docker host's LAN IP for a separate simulator.
@@ -51,6 +51,7 @@ Run a full three-lap race on each rig, including the results screen, and verify 
 
 {{< cards cols="2" >}}
 {{< card link="./configuration/" title="The Collector page" subtitle="Understand cards, pills and the top menu." >}}
+{{< card link="./podman-splunk/" title="Run with Podman and local Splunk" subtitle="Deploy the collector, HEC index and driver dashboards on Apple Silicon." >}}
 {{< card link="./controller-config/" title="Configure the collector" subtitle="Set the event, rigs, destinations and queue." >}}
 {{< card link="./telemetry/" title="Connect F1 25" subtitle="Choose the right game address and UDP port." >}}
 {{< card link="./managing-collectors/" title="Run an event" subtitle="Manage drivers, record, import, export and replay." >}}

@@ -2,6 +2,23 @@
 
 The F1 2025 documentation site, built with Hugo and the pinned Hextra theme.
 
+## Local Podman + Splunk Enterprise integration
+
+This fork includes a hardened, digest-pinned v6.0.5 collector runtime and a
+self-contained Splunk Enterprise app with live telemetry, lap-comparison,
+results and pipeline-health dashboards.
+
+```sh
+./podman/f1ctl start
+python3 scripts/build_splunk_views.py
+./scripts/setup_local_splunk.sh
+./scripts/smoke_test.sh
+```
+
+See [Local Podman and Splunk Enterprise](content/f1-2025/podman-splunk.md) for
+the architecture, bundled-playback test, F1 25 UDP settings, credential
+handling, validation and rollback.
+
 ## Preview locally
 
 Install Hugo **0.165.0** and Go **1.23 or newer**, then run:
